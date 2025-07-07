@@ -11,6 +11,7 @@ local common = require("dbee.ui.common")
 ---@field private page_size integer
 ---@field private focus_result boolean
 ---@field private lock_header boolean
+---@field private winbar_prev_state table<integer, string> stores winbar values when locking result header
 ---@field private mappings key_mapping[]
 ---@field private page_index integer index of the current page
 ---@field private page_ammount integer number of pages in the current result set
@@ -38,6 +39,7 @@ function ResultUI:new(handler, opts)
     page_ammount = 0,
     focus_result = opts.focus_result,
     lock_header = opts.lock_header,
+    winbar_prev_state = {},
     mappings = opts.mappings or {},
     stop_progress = function() end,
     progress_opts = opts.progress or {},
@@ -121,49 +123,55 @@ function ResultUI:has_window()
 end
 
 ---@private
-function get_lef_tmargin_width(winid)
-  local width = 0
-  local function get_opt(opt)
-    return vim.api.nvim_get_option(winid, opt)
-  end
-
-  if get_opt("number") or get_opt("relativenubmer") then
-        width = width + get_opt("numberwidth")
-  end
-
-  if end
-end
-
----@private
 function ResultUI:focus_result_window()
   if self.focus_result and self:has_window() then
     return vim.api.nvim_set_current_win(self.winid)
   end
 end
 
-local winbar_prev_state = {}
 ---@private
+---@param winid integer
+---@return number # width of the left margin/gutter
+local function get_left_margin_width(winid)
+  local width = 0
+  local get_opt = function(opt)
+    return vim.api.nvim_win_get_option(winid, opt)
+  end
+  if get_opt("number") or get_opt("relativenumber") then
+    width = width + get_opt("numberwidth")
+  end
+  width = width + tonumber(get_opt("foldcolumn"))
+  if get_opt("signcolumn") == "yes" then
+    width = width + 2
+  end
+  return width or 0
+end
+
+---@private
+---@param winid integer
+---@param bufnr integer
 function ResultUI:update_winbar_on_scroll(winid, bufnr)
   local topline = vim.fn.line("w0", winid)
   if topline > 1 then
-    -- Save previous winbar if window scrolls past first line
-    if not winbar_prev_state[winid] then
-      winbar_prev_state[winid] = vim.api.nvim_get_option_value("winbar", { win = winid })
+    -- save previous winbar if window scrolls past first line
+    if not self.winbar_prev_state[winid] then
+      self.winbar_prev_state[winid] = vim.api.nvim_get_option_value("winbar", { win = winid })
     end
-
-    -- Set winbar to the first line (columns headers) of the buffer
+    -- set winbar to the first line (columns headers) of the buffer
     local wininfo = vim.fn.getwininfo(winid)[1]
     local leftcol = wininfo and wininfo.leftcol or 0
     local first_line = vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1] or ""
     local win_width = vim.api.nvim_win_get_width(winid) or 0
-    local visible_line = vim.fn.strcharpart(first_line, leftcol, win_width)
-
+    local left_margin_width = get_left_margin_width(winid)
+    -- centers and align winbar to the buffer based on the left margin width
+    local visible_line = string.rep(" ", left_margin_width)
+      .. vim.fn.strcharpart(first_line, leftcol, win_width - left_margin_width)
     vim.api.nvim_set_option_value("winbar", visible_line, { win = winid })
   else
-    -- Restore previous winbar if window is scrolled back to the first line
-    if winbar_prev_state[winid] then
-      vim.api.nvim_set_option_value("winbar", winbar_prev_state[winid], { win = winid })
-      winbar_prev_state[winid] = nil
+    -- restore previous winbar if window is scrolled back to the first line
+    if self.winbar_prev_state[winid] then
+      vim.api.nvim_set_option_value("winbar", self.winbar_prev_state[winid], { win = winid })
+      self.winbar_prev_state[winid] = nil
     end
   end
 end
@@ -506,16 +514,12 @@ function ResultUI:show(winid)
   -- configure window options (needs to be set after setting the buffer to window)
   common.configure_window_options(self.winid, self.window_options)
 
-  vim.api.nvim_win_set_option(self.winid, "number", false)
-  vim.api.nvim_win_set_option(self.winid, "relativenumber", false)
-  vim.api.nvim_win_set_option(self.winid, "signcolumn", "no")
-  vim.api.nvim_win_set_option(self.winid, "foldcolumn", "0")
-  vim.api.nvim_win_set_option(self.winid, "sidescrolloff", 0)
-
   if self.lock_header then
-    utils.create_singleton_autocmd({ "WinScrolled" }, {
+    utils.create_singleton_autocmd({ "WinScrolled", "OptionSet" }, {
       callback = function()
-        self:update_winbar_on_scroll(self.winid, self.bufnr)
+        if vim.api.nvim_win_is_valid(self.winid) then
+          self:update_winbar_on_scroll(self.winid, self.bufnr)
+        end
       end,
     })
   end
