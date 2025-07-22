@@ -22,6 +22,7 @@ local api_ui = require("dbee.api.ui")
 ---@field open fun(self: Layout) function to open ui.
 ---@field reset fun(self: Layout) function to reset ui.
 ---@field close fun(self: Layout) function to close ui.
+---@field toggle_sidebar fun(self: Layout) function to toggle the sidebar (drawer and call log) visibility.
 
 local layouts = {}
 
@@ -190,6 +191,35 @@ function layouts.Default:close()
   tools.restore(self.egg)
   self.egg = nil
   self.is_opened = false
+end
+
+---@package
+function layouts.Default:toggle_sidebar()
+  --drawer
+  if self.windows["drawer"] then
+    vim.api.nvim_win_close(self.windows["drawer"], true)
+    self.windows["drawer"] = nil
+  else
+    vim.cmd("to" .. self.drawer_width .. "vsplit")
+    local win = vim.api.nvim_get_current_win()
+    self.windows["drawer"] = win
+    api_ui.drawer_show(win)
+    self:configure_window_on_switch(self.on_switch, win, api_ui.drawer_show)
+    self:configure_window_on_quit(win)
+  end
+
+  -- call log
+  if self.windows["call_log"] then
+    vim.api.nvim_win_close(self.windows["call_log"], true)
+    self.windows["call_log"] = nil
+  else
+    vim.cmd("belowright " .. self.call_log_height .. "split")
+    local win = vim.api.nvim_get_current_win()
+    self.windows["call_log"] = win
+    api_ui.call_log_show(win)
+    self:configure_window_on_switch(self.on_switch, win, api_ui.call_log_show)
+    self:configure_window_on_quit(win)
+  end
 end
 
 return layouts
