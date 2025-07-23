@@ -163,7 +163,7 @@ end
 
 --- Toggle the sidebar UI (drawer and call_log).
 function ui.sidebar_toggle()
-  state.config().window_layout:toggle_sidebar()
+  state.config().window_layout:sidebar_toggle()
 end
 
 --- Trigger an action in drawer.

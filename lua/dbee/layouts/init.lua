@@ -22,7 +22,7 @@ local api_ui = require("dbee.api.ui")
 ---@field open fun(self: Layout) function to open ui.
 ---@field reset fun(self: Layout) function to reset ui.
 ---@field close fun(self: Layout) function to close ui.
----@field toggle_sidebar fun(self: Layout) function to toggle the sidebar (drawer and call log) visibility.
+---@field sidebar_toggle fun(self: Layout) function to toggle the sidebar (drawer and call log) visibility.
 
 local layouts = {}
 
@@ -194,18 +194,18 @@ function layouts.Default:close()
 end
 
 ---@package
-function layouts.Default:toggle_sidebar()
+function layouts.Default:sidebar_toggle()
   --drawer
   if self.windows["drawer"] then
     vim.api.nvim_win_close(self.windows["drawer"], true)
     self.windows["drawer"] = nil
   else
     vim.cmd("to" .. self.drawer_width .. "vsplit")
-    local win = vim.api.nvim_get_current_win()
-    self.windows["drawer"] = win
-    api_ui.drawer_show(win)
-    self:configure_window_on_switch(self.on_switch, win, api_ui.drawer_show)
-    self:configure_window_on_quit(win)
+    local drawer_win = vim.api.nvim_get_current_win()
+    self.windows["drawer"] = drawer_win
+    api_ui.drawer_show(drawer_win)
+    self:configure_window_on_switch(self.on_switch, drawer_win, api_ui.drawer_show)
+    self:configure_window_on_quit(drawer_win)
   end
 
   -- call log
@@ -214,11 +214,13 @@ function layouts.Default:toggle_sidebar()
     self.windows["call_log"] = nil
   else
     vim.cmd("belowright " .. self.call_log_height .. "split")
-    local win = vim.api.nvim_get_current_win()
-    self.windows["call_log"] = win
-    api_ui.call_log_show(win)
-    self:configure_window_on_switch(self.on_switch, win, api_ui.call_log_show)
-    self:configure_window_on_quit(win)
+    local call_log_win = vim.api.nvim_get_current_win()
+    self.windows["call_log"] = call_log_win
+    api_ui.call_log_show(call_log_win)
+    self:configure_window_on_switch(self.on_switch, call_log_win, api_ui.call_log_show)
+    self:configure_window_on_quit(call_log_win)
+    -- set cursor to drawer
+    vim.api.nvim_set_current_win(self.windows["drawer"])
   end
 end
 
