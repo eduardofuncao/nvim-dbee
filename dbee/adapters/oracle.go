@@ -132,6 +132,8 @@ func (*Oracle) GetHelpers(opts *core.TableOptions) map[string]string {
 					return "TABLE"
 				case core.StructureTypeView:
 					return "VIEW"
+				case core.StructureTypeMaterializedView:
+					return "MATERIALIZED_VIEW"
 				default:
 					return "UNKNOWN"
 				}
